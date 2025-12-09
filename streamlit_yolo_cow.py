@@ -1,40 +1,39 @@
 import streamlit as st
-import gdown
-import os
 from ultralytics import YOLO
 from PIL import Image
 import tempfile
 import cv2
 
-st.set_page_config(page_title = "Different Yolo Models", layout = "centered")
-st.title("Yolo Models")
+st.set_page_config(page_title="Different YOLO Models", layout="centered")
+st.title("YOLO Models")
 
-MODEL_URLS = {
-    "Yolo 8 Nano + Trained manually with limited cow images": "https://drive.google.com/uc?id=1MUadIAXW63vh_w1TPSWjUFVT7sAShxc9",
-    "Yolo 11 Nano": "https://drive.google.com/uc?id=1dg-_9_MSHvyN2FgOY4vovRXN9NoaZNCY",
-    "Yolo 11 Extra": "https://drive.google.com/uc?id=1NoZTxteebhEPG-gPNYfa-XGDtNA8mw1R",
-    "Yolo 8 Nano": "https://drive.google.com/uc?id=1BknHGF2-2NsOzxcw7BIF7MRHhjETNNFU",
-    "Yolo 8 Extra": "https://drive.google.com/uc?id=1jb8ZrmSBWz_mRyXu5PPKCSayCZkg3_HK"
+st.divider()
+
+# am removing all the gdown commands since the final container will have all the models in it locally to run
+
+MODEL_OPTIONS = {
+    "YOLOv8 Nano": "yolov8n.pt",
+    "YOLOv8 Small": "yolov8s.pt",
+    "YOLOv8 Medium": "yolov8m.pt",
+    "YOLOv8 Large": "yolov8l.pt",
+    "YOLOv8 Extra-Large": "yolov8x.pt"
 }
 
-model_name = st.sidebar.selectbox("Choose a YOLO model", list(MODEL_URLS.keys()))
+model_name = st.sidebar.selectbox("Choose a YOLO model", list(MODEL_OPTIONS.keys()))
 confidence_threshold = st.sidebar.slider("Confidence Threshold", 0.1, 1.0, 0.25, 0.05)
 
+# Load pre-installed model
+
 @st.cache_resource
-def download_and_load_model(url, name):
-    os.makedirs("models", exist_ok=True)
-    model_path = f"models/{name}.pt"
-    if not os.path.exists(model_path):
-        #st.info(f"Downloading {name} model from Google Drive...")
-        gdown.download(url, model_path, quiet=False)
+def load_model(model_path):
     return YOLO(model_path)
 
-model = download_and_load_model(MODEL_URLS[model_name], model_name)
+model = load_model(MODEL_OPTIONS[model_name])
 
 uploaded_file = st.file_uploader("Upload an image or video", type=["jpg", "jpeg", "png", "mp4"])
 
 if uploaded_file:
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as temp_file:
         temp_file.write(uploaded_file.read())
         file_path = temp_file.name
 
@@ -44,22 +43,33 @@ if uploaded_file:
         image = Image.open(file_path).convert("RGB")
         st.image(image, caption="Uploaded Image", use_column_width=True)
 
-        results = model(image, conf=confidence_threshold)
-        result_img = results[0].plot()
+        with st.spinner("Running detection..."):
+            results = model(image, conf=confidence_threshold)
+            result_img = results[0].plot()
+        
         st.image(result_img, caption="Detected", use_column_width=True)
+        
+        # Show detection stats
+
+        detections = results[0].boxes
+        st.info(f"Detected {len(detections)} objects")
+        
     else:
         st.video(file_path)
         cap = cv2.VideoCapture(file_path)
 
         st.info("Processing video (showing 10 annotated frames)...")
         frame_count = 0
+        
         while cap.isOpened() and frame_count < 10:
             ret, frame = cap.read()
             if not ret:
                 break
+            
             results = model(frame, conf=confidence_threshold)
             annotated = results[0].plot()
             st.image(annotated, caption=f"Frame {frame_count + 1}", use_column_width=True)
             frame_count += 1
+            
         cap.release()
-
+        st.success(f"Processed {frame_count} frames")
