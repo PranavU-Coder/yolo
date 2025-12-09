@@ -3,6 +3,7 @@ from ultralytics import YOLO
 from PIL import Image
 import tempfile
 import cv2
+import os
 
 st.set_page_config(page_title="Different YOLO Models", layout="centered")
 st.title("YOLO Models")
@@ -41,16 +42,15 @@ if uploaded_file:
 
     if not is_video:
         image = Image.open(file_path).convert("RGB")
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+        st.image(image, caption="Uploaded Image", use_container_width=True)
 
         with st.spinner("Running detection..."):
             results = model(image, conf=confidence_threshold)
             result_img = results[0].plot()
         
-        st.image(result_img, caption="Detected", use_column_width=True)
+        st.image(result_img, caption="Detected", use_container_width=True)
         
         # Show detection stats
-
         detections = results[0].boxes
         st.info(f"Detected {len(detections)} objects")
         
@@ -68,7 +68,7 @@ if uploaded_file:
             
             results = model(frame, conf=confidence_threshold)
             annotated = results[0].plot()
-            st.image(annotated, caption=f"Frame {frame_count + 1}", use_column_width=True)
+            st.image(annotated, caption=f"Frame {frame_count + 1}", use_container_width=True)
             frame_count += 1
             
         cap.release()
